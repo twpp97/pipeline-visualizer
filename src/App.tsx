@@ -100,23 +100,20 @@ export default function App() {
     if (!data) return null
     
     let filteredNodes = data.nodes
-    let externalNodeNames = new Set<string>()
     
     if (selectedAppType !== null) {
       // Get nodes of this app_type
       const typeNodes = data.nodes.filter(n => n.app_type === selectedAppType)
       const typeNodeNames = new Set(typeNodes.map(n => n.name))
       
-      // Also include external nodes that connect to this DAG (shared apps)
+      // Also include connected nodes
       const connectedNodeNames = new Set(typeNodeNames)
       data.edges.forEach(e => {
         if (typeNodeNames.has(e.from)) {
           connectedNodeNames.add(e.to)
-          externalNodeNames.add(e.to)
         }
         if (typeNodeNames.has(e.to)) {
           connectedNodeNames.add(e.from)
-          externalNodeNames.add(e.from)
         }
       })
       
@@ -132,13 +129,7 @@ export default function App() {
       filteredNodeNames.has(e.from) || filteredNodeNames.has(e.to)
     )
     
-    // Mark external nodes
-    const nodesWithExternalFlag = filteredNodes.map(n => ({
-      ...n,
-      isExternal: externalNodeNames.has(n.name)
-    }))
-    
-    return { nodes: nodesWithExternalFlag, edges: filteredEdges }
+    return { nodes: filteredNodes, edges: filteredEdges }
   }, [data, selectedAppType, selectedTypes])
 
   // Toggle type (for future use in filtering UI)
@@ -464,27 +455,12 @@ export default function App() {
         }
         return '#00ff88' // Neutral color for apps
       })
-      .attr('stroke', (d: D3Node) => {
-        if (highlightPath && pathNodes.has(d.name)) {
-          return '#fff'
-        }
-        // External nodes get a dashed border
-        return d.isExternal ? '#ff6b6b' : '#fff'
-      })
-      .attr('stroke-width', (d: D3Node) => {
-        if (highlightPath && pathNodes.has(d.name)) {
-          return 4
-        }
-        // External nodes have thicker border
-        return d.isExternal ? 3 : 2
-      })
-      .attr('stroke-dasharray', (d: D3Node) => d.isExternal ? '4,2' : 'none')
+      .attr('stroke', '#fff')
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', 'none')
       .style('filter', (d: D3Node) => {
         if (d.name === hoveredNode || d.name === selectedNode) {
-          const color = selectedAppType !== null && d.app_type === selectedAppType
-            ? APP_TYPES[selectedAppType]?.color
-            : APP_TYPES[d.app_type]?.color
-          return `drop-shadow(0 0 10px ${color || '#888'})`
+          return 'drop-shadow(0 0 10px #00ff88)'
         }
         return 'none'
       })
@@ -492,9 +468,7 @@ export default function App() {
         if (highlightPath && !pathNodes.has(d.name)) {
           return 0.2
         }
-        // External nodes slightly transparent
-        const baseOpacity = d.isExternal ? 0.7 : 0.85
-        return d.name === hoveredNode || d.name === selectedNode ? 1 : baseOpacity
+        return d.name === hoveredNode || d.name === selectedNode ? 1 : 0.85
       })
 
     // Node label (no type label)
@@ -680,10 +654,10 @@ export default function App() {
                 key={t}
                 className={`type-item ${isSelected ? 'selected' : ''}`}
                 onClick={() => setSelectedAppType(selectedAppType === t ? null : t)}
-                style={{ '--type-color': info.color } as React.CSSProperties}
+                style={{ '--type-color': '#00ff88' } as React.CSSProperties}
               >
                 <div className="type-info">
-                  <span className="type-icon" style={{ color: info.color }}>{info.icon}</span>
+                  <span className="type-icon">📊</span>
                   <span className="type-label">{info.label}</span>
                   <span className="type-badge">{stats?.count || 0}</span>
                 </div>
