@@ -297,12 +297,94 @@ export default function App() {
 
     const width = window.innerWidth - 280
     const height = window.innerHeight
+    const verticalSpacing = 80
+    const horizontalSpacing = 150
 
     const { nodes, edges } = filteredData
     const nodesMap = new Map(nodes.map(n => [n.name, n]))
     const links = edges
       .map(e => ({ source: nodesMap.get(e.from)!, target: nodesMap.get(e.to)! }))
       .filter(l => l.source && l.target)
+
+    // Calculate hierarchical layout (top to bottom)
+    // Find root nodes (no incoming edges)
+    const inDegree = new Map<string, number>()
+    const outDegree = new Map<string, number>()
+    nodes.forEach(n => {
+      inDegree.set(n.name, 0)
+      outDegree.set(n.name, 0)
+    })
+    edges.forEach(e => {
+      inDegree.set(e.to, (inDegree.get(e.to) || 0) + 1)
+      outDegree.set(e.from, (outDegree.get(e.from) || 0) + 1)
+    })
+
+    // Find root nodes
+    const roots = nodes.filter(n => (inDegree.get(n.name) || 0) === 0)
+    
+    // Calculate depth for each node using BFS
+    const depth = new Map<string, number>()
+    const visited = new Set<string>()
+    const queue: { name: string; d: number }[] = roots.map(r => ({ name: r.name, d: 0 }))
+    
+    while (queue.length > 0) {
+      const { name, d } = queue.shift()!
+      if (visited.has(name)) continue
+      visited.add(name)
+      depth.set(name, d)
+      
+      // Find all nodes this node points to
+      edges.filter(e => e.from === name).forEach(e => {
+        if (!visited.has(e.to)) {
+          queue.push({ name: e.to, d: d + 1 })
+        }
+      })
+    }
+
+    // Handle disconnected nodes
+    nodes.forEach(n => {
+      if (!depth.has(n.name)) {
+        depth.set(n.name, 0)
+      }
+    })
+
+    // Group nodes by depth
+    const depthGroups = new Map<number, string[]>()
+    depth.forEach((d, name) => {
+      if (!depthGroups.has(d)) {
+        depthGroups.set(d, [])
+      }
+      depthGroups.get(d)!.push(name)
+    })
+
+    // Assign positions
+    const maxDepth = Math.max(...depthGroups.keys())
+    const positions = new Map<string, { x: number; y: number }>()
+    
+    depthGroups.forEach((nodeNames, d) => {
+      const y = 50 + d * verticalSpacing
+      const count = nodeNames.length
+      const startX = (width - (count - 1) * horizontalSpacing) / 2
+      
+      nodeNames.forEach((name, i) => {
+        positions.set(name, {
+          x: startX + i * horizontalSpacing,
+          y
+        })
+      })
+    })
+
+    // Update node positions
+    nodes.forEach(n => {
+      const pos = positions.get(n.name)
+      if (pos) {
+        n.x = pos.x
+        n.y = pos.y
+      } else {
+        n.x = width / 2
+        n.y = 50
+      }
+    })
 
     // Create container group for zoom
     const g = svg.append('g')
@@ -316,13 +398,6 @@ export default function App() {
       })
     
     svg.call(zoom as any)
-
-    // Create simulation
-    const simulation = d3.forceSimulation<D3Node>(nodes)
-      .force('link', d3.forceLink(links).id((d: any) => d.name).distance(60))
-      .force('charge', d3.forceManyBody().strength(-150))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius(35))
 
     // Arrow marker for data flow direction
     svg.append('defs').selectAll('marker')
@@ -386,21 +461,7 @@ export default function App() {
       .enter()
       .append('g')
       .style('cursor', 'pointer')
-      .call(d3.drag<SVGGElement, D3Node>()
-        .on('start', (event, d) => {
-          if (!event.active) simulation.alphaTarget(0.3).restart()
-          d.fx = d.x
-          d.fy = d.y
-        })
-        .on('drag', (event, d) => {
-          d.fx = event.x
-          d.fy = event.y
-        })
-        .on('end', (event, d) => {
-          if (!event.active) simulation.alphaTarget(0)
-          d.fx = null
-          d.fy = null
-        }) as any)
+      .attr('transform', (d: D3Node) => `translate(${d.x},${d.y})`)
       .on('click', (_, d) => setSelectedNode(d.name))
       .on('mouseenter', (_, d) => setHoveredNode(d.name))
       .on('mouseleave', () => setHoveredNode(null))
@@ -443,20 +504,7 @@ export default function App() {
       .style('text-shadow', '0 1px 4px rgba(0,0,0,0.9)')
       .style('opacity', (d: D3Node) => highlightPath && !pathNodes.has(d.name) ? 0.2 : 1)
 
-    // Update positions
-    simulation.on('tick', () => {
-      link
-        .attr('x1', (d: any) => d.source.x)
-        .attr('y1', (d: any) => d.source.y)
-        .attr('x2', (d: any) => d.target.x)
-        .attr('y2', (d: any) => d.target.y)
-
-      node.attr('transform', (d: D3Node) => `translate(${d.x},${d.y})`)
-    })
-
-    return () => {
-      simulation.stop()
-    }
+    return () => {}
   }, [filteredData, hoveredNode, selectedNode, highlightPath, pathNodes])
 
   // Minimap effect
