@@ -59,8 +59,6 @@ export default function App() {
   )
   const [searchQuery, setSearchQuery] = useState('')
   const [zoomTransform, setZoomTransform] = useState<d3.ZoomTransform>(d3.zoomIdentity)
-  const [showParticles, setShowParticles] = useState(true)
-  const [animationSpeed, setAnimationSpeed] = useState(1)
   const [showMinimap, setShowMinimap] = useState(true)
   const [highlightPath, setHighlightPath] = useState(false)
   const [pathNodes, setPathNodes] = useState<Set<string>>(new Set())
@@ -326,22 +324,21 @@ export default function App() {
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('collision', d3.forceCollide().radius(35))
 
-    // Arrow marker
+    // Arrow marker for data flow direction
     svg.append('defs').selectAll('marker')
       .data(['arrow'])
       .enter()
       .append('marker')
       .attr('id', 'arrow')
       .attr('viewBox', '0 -5 10 10')
-      .attr('refX', 20)
+      .attr('refX', 25)
       .attr('refY', 0)
-      .attr('markerWidth', 6)
-      .attr('markerHeight', 6)
+      .attr('markerWidth', 8)
+      .attr('markerHeight', 8)
       .attr('orient', 'auto')
       .append('path')
       .attr('d', 'M0,-5L10,0L0,5')
-      .attr('fill', '#888')
-      .attr('opacity', 0.5)
+      .attr('fill', '#00ff88')
 
     // Draw edges
     const link = g.append('g')
@@ -380,43 +377,7 @@ export default function App() {
       })
       .attr('marker-end', 'url(#arrow)')
 
-    // Animated particles on edges
-    const particles: any[] = []
-    
-    if (showParticles && links.length > 0 && !highlightPath) {
-      const particleGroup = g.append('g').attr('class', 'particles')
-      
-      links.forEach((l, i) => {
-        if (i % 3 === 0) {
-          const particle = particleGroup.append('circle')
-            .attr('r', 3)
-            .attr('fill', '#00ff88')
-            .attr('opacity', 0.8)
-          
-          const animate = () => {
-            const duration = 2000 / animationSpeed + Math.random() * 1000
-            const pathLength = Math.sqrt(
-              Math.pow((l.target as D3Node).x! - (l.source as D3Node).x!, 2) +
-              Math.pow((l.target as D3Node).y! - (l.source as D3Node).y!, 2)
-            )
-            
-            if (pathLength > 0) {
-              particle
-                .attr('cx', (l.source as D3Node).x)
-                .attr('cy', (l.source as D3Node).y)
-                .transition()
-                .duration(duration)
-                .ease(d3.easeLinear)
-                .attr('cx', (l.target as D3Node).x)
-                .attr('cy', (l.target as D3Node).y)
-                .on('end', animate)
-            }
-          }
-          animate()
-          particles.push(particle)
-        }
-      })
-    }
+
 
     // Draw nodes
     const node = g.append('g')
@@ -495,10 +456,9 @@ export default function App() {
     })
 
     return () => {
-      particles.forEach(p => p.interrupt())
       simulation.stop()
     }
-  }, [filteredData, hoveredNode, selectedNode, showParticles, animationSpeed, highlightPath, pathNodes])
+  }, [filteredData, hoveredNode, selectedNode, highlightPath, pathNodes])
 
   // Minimap effect
   useEffect(() => {
@@ -680,29 +640,6 @@ export default function App() {
         </div>
 
         <div className="sidebar-footer">
-          {/* Animation controls */}
-          <div className="animation-controls">
-            <label className="toggle-label">
-              <input
-                type="checkbox"
-                checked={showParticles}
-                onChange={(e) => setShowParticles(e.target.checked)}
-              />
-              <span>Data Flow Animation</span>
-            </label>
-            <div className="speed-control">
-              <span>Speed:</span>
-              <input
-                type="range"
-                min="0.5"
-                max="3"
-                step="0.5"
-                value={animationSpeed}
-                onChange={(e) => setAnimationSpeed(Number(e.target.value))}
-              />
-            </div>
-          </div>
-          
           {/* View controls */}
           <div className="view-controls">
             <label className="toggle-label">
