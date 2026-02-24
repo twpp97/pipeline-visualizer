@@ -366,11 +366,8 @@ export default function App() {
             return '#fff'
           }
         }
-        // Use selected app_type color if one is selected
-        if (selectedAppType !== null) {
-          return APP_TYPES[selectedAppType]?.color || '#888'
-        }
-        return APP_TYPES[d.source.app_type]?.color || '#888'
+        // Apps are neutral - use neutral color for edges
+        return '#00ff88'
       })
       .attr('stroke-width', (d: any) => {
         if (highlightPath && selectedNode) {
@@ -402,7 +399,7 @@ export default function App() {
         if (i % 3 === 0) {
           const particle = particleGroup.append('circle')
             .attr('r', 3)
-            .attr('fill', APP_TYPES[(l.source as D3Node).app_type]?.color || '#fff')
+            .attr('fill', '#00ff88')
             .attr('opacity', 0.8)
           
           const animate = () => {
@@ -572,8 +569,8 @@ export default function App() {
       .attr('cx', d => d.x)
       .attr('cy', d => d.y)
       .attr('r', 4)
-      .attr('fill', d => APP_TYPES[d.app_type]?.color || '#888')
-      .attr('opacity', d => selectedTypes.has(d.app_type) ? 1 : 0.3)
+      .attr('fill', '#00ff88')
+      .attr('opacity', 0.8)
 
     // Viewport rectangle
     const mainWidth = window.innerWidth - 280
@@ -759,8 +756,8 @@ export default function App() {
             <span className="icon">◈</span>
             Pipeline DAG
             {selectedAppType !== null && (
-              <span className="badge" style={{ background: APP_TYPES[selectedAppType]?.color + '40', color: APP_TYPES[selectedAppType]?.color }}>
-                {APP_TYPES[selectedAppType]?.icon} {APP_TYPES[selectedAppType]?.label}
+              <span className="badge">
+                Filtered by DAG
               </span>
             )}
             <span className="badge">{filteredData?.nodes.length || 0} nodes</span>
