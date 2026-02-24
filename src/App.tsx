@@ -405,14 +405,13 @@ export default function App() {
       .on('mouseenter', (_, d) => setHoveredNode(d.name))
       .on('mouseleave', () => setHoveredNode(null))
 
-    // Node circle - same app_type = same color
+    // Node circle - unified color based on selected DAG
     node.append('circle')
       .attr('r', (d: D3Node) => d.is_last === '1' ? 14 : 10)
       .attr('fill', (d: D3Node) => {
-        // Apps don't have type - use neutral color
-        // Only color by type when filtering by DAG type
+        // When filtering by DAG, all nodes use the selected DAG's color
         if (selectedAppType !== null) {
-          return APP_TYPES[d.app_type]?.color || '#888'
+          return APP_TYPES[selectedAppType]?.color || '#00ff88'
         }
         return '#00ff88' // Neutral color for apps
       })
@@ -576,21 +575,22 @@ export default function App() {
             </div>
           )}
 
-          {/* App Type Selector */}
+          {/* DAG Filter */}
           <div className="app-type-selector">
-            <label>Select DAG:</label>
+            <label>Filter by DAG:</label>
             <select 
               value={selectedAppType ?? ''} 
               onChange={(e) => setSelectedAppType(e.target.value ? Number(e.target.value) : null)}
               className="app-type-select"
             >
-              <option value="">All Types</option>
+              <option value="">All DAGs</option>
               {Object.entries(APP_TYPES).map(([type, info]) => {
                 const t = Number(type)
                 const count = typeStats[t]?.count || 0
+                if (count === 0) return null
                 return (
                   <option key={t} value={t}>
-                    {info.icon} {info.label} ({count})
+                    {info.label} ({count})
                   </option>
                 )
               })}
@@ -630,7 +630,7 @@ export default function App() {
                     className="type-bar-fill" 
                     style={{ 
                       width: `${((stats?.count || 0) / (data?.stats?.total_nodes || data?.nodes?.length || 1)) * 100}%`,
-                      background: info.color 
+                      background: '#00ff88'
                     }}
                   />
                 </div>
@@ -710,18 +710,11 @@ export default function App() {
             {(() => {
               const node = data.nodes.find(n => n.name === selectedNode)
               if (!node) return null
-              const typeInfo = APP_TYPES[node.app_type]
               const incoming = data.edges.filter(e => e.to === selectedNode)
               const outgoing = data.edges.filter(e => e.from === selectedNode)
               
               return (
                 <>
-                  <div className="detail-row">
-                    <span className="label">Type</span>
-                    <span className="value" style={{ color: typeInfo?.color }}>
-                      {typeInfo?.icon} {typeInfo?.label}
-                    </span>
-                  </div>
                   <div className="detail-row">
                     <span className="label">ID</span>
                     <span className="value">{node.id}</span>
