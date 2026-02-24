@@ -280,7 +280,7 @@ export default function App() {
     console.log('Fetching data...')
     setLoading(true)
     setError(null)
-    fetch('/pipelines.json')
+    fetch('/pipeline-visualizer/pipelines.json')
       .then(res => {
         console.log('Response status:', res.status)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
