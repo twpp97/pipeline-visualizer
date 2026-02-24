@@ -95,18 +95,51 @@ export default function App() {
     return stats
   }, [data])
 
-  // Show all nodes and edges (no filtering by app_type)
+  // Filtered nodes based on app_type selection
   const filteredData = useMemo(() => {
     if (!data) return null
     
-    // Show all nodes with their type info (for coloring)
-    const nodesWithFlag = data.nodes.map(n => ({
+    let filteredNodes = data.nodes
+    let externalNodeNames = new Set<string>()
+    
+    if (selectedAppType !== null) {
+      // Get nodes of this app_type
+      const typeNodes = data.nodes.filter(n => n.app_type === selectedAppType)
+      const typeNodeNames = new Set(typeNodes.map(n => n.name))
+      
+      // Also include external nodes that connect to this DAG (shared apps)
+      const connectedNodeNames = new Set(typeNodeNames)
+      data.edges.forEach(e => {
+        if (typeNodeNames.has(e.from)) {
+          connectedNodeNames.add(e.to)
+          externalNodeNames.add(e.to)
+        }
+        if (typeNodeNames.has(e.to)) {
+          connectedNodeNames.add(e.from)
+          externalNodeNames.add(e.from)
+        }
+      })
+      
+      filteredNodes = data.nodes.filter(n => connectedNodeNames.has(n.name))
+    } else if (selectedTypes.size > 0 && selectedTypes.size < Object.keys(APP_TYPES).length) {
+      filteredNodes = data.nodes.filter(n => selectedTypes.has(n.app_type))
+    }
+    
+    const filteredNodeNames = new Set(filteredNodes.map(n => n.name))
+    
+    // Show edges where at least one end is in filtered nodes
+    const filteredEdges = data.edges.filter(e => 
+      filteredNodeNames.has(e.from) || filteredNodeNames.has(e.to)
+    )
+    
+    // Mark external nodes
+    const nodesWithExternalFlag = filteredNodes.map(n => ({
       ...n,
-      isExternal: false
+      isExternal: externalNodeNames.has(n.name)
     }))
     
-    return { nodes: nodesWithFlag, edges: data.edges }
-  }, [data])
+    return { nodes: nodesWithExternalFlag, edges: filteredEdges }
+  }, [data, selectedAppType, selectedTypes])
 
   // Toggle type (for future use in filtering UI)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -427,15 +460,12 @@ export default function App() {
     node.append('circle')
       .attr('r', (d: D3Node) => d.is_last === '1' ? 14 : 10)
       .attr('fill', (d: D3Node) => {
-        // If app_type selected, use that color for all nodes of that type
-        // External nodes use their own app_type color
+        // Apps don't have type - use neutral color
+        // Only color by type when filtering by DAG type
         if (selectedAppType !== null) {
-          if (d.app_type === selectedAppType) {
-            return APP_TYPES[selectedAppType]?.color || '#888'
-          }
           return APP_TYPES[d.app_type]?.color || '#888'
         }
-        return APP_TYPES[d.app_type]?.color || '#888'
+        return '#00ff88' // Neutral color for apps
       })
       .attr('stroke', (d: D3Node) => {
         if (highlightPath && pathNodes.has(d.name)) {
@@ -470,18 +500,7 @@ export default function App() {
         return d.name === hoveredNode || d.name === selectedNode ? 1 : baseOpacity
       })
 
-    // App type number
-    node.append('text')
-      .text((d: D3Node) => d.app_type)
-      .attr('text-anchor', 'middle')
-      .attr('dy', 4)
-      .attr('fill', '#000')
-      .attr('font-size', '9px')
-      .attr('font-weight', 'bold')
-      .attr('pointer-events', 'none')
-      .style('opacity', (d: D3Node) => highlightPath && !pathNodes.has(d.name) ? 0.2 : 1)
-
-    // Node label
+    // Node label (no type label)
     node.append('text')
       .text((d: D3Node) => d.name.replace('App', '').replace(/([A-Z])/g, ' $1').trim())
       .attr('dx', 15)
@@ -620,58 +639,66 @@ export default function App() {
                     setSearchQuery('')
                   }}
                 >
-                  <span style={{ color: APP_TYPES[node.app_type]?.color }}>
-                    {APP_TYPES[node.app_type]?.icon}
-                  </span>
                   <span>{node.name}</span>
                 </div>
               ))}
             </div>
           )}
 
-          {/* DAG Type Info (read-only, for reference) */}
+          {/* App Type Selector */}
           <div className="app-type-selector">
-            <label>DAG Types:</label>
-            <div className="type-info-list">
+            <label>Select DAG:</label>
+            <select 
+              value={selectedAppType ?? ''} 
+              onChange={(e) => setSelectedAppType(e.target.value ? Number(e.target.value) : null)}
+              className="app-type-select"
+            >
+              <option value="">All Types</option>
               {Object.entries(APP_TYPES).map(([type, info]) => {
                 const t = Number(type)
                 const count = typeStats[t]?.count || 0
-                if (count === 0) return null
                 return (
-                  <div key={t} className="type-info-item" style={{ borderLeftColor: info.color }}>
-                    <span style={{ color: info.color }}>{info.icon}</span>
-                    <span>{info.label}</span>
-                    <span className="type-badge">{count}</span>
-                  </div>
+                  <option key={t} value={t}>
+                    {info.icon} {info.label} ({count})
+                  </option>
                 )
               })}
-            </div>
+            </select>
+          </div>
+
+          <div className="sidebar-actions">
+            <button onClick={() => { setSelectedAppType(null); selectAll(); }}>All</button>
+            <button onClick={() => { setSelectedAppType(null); selectNone(); }}>Clear</button>
           </div>
         </div>
 
-        {/* Type distribution stats (read-only) */}
         <div className="type-list">
           {Object.entries(APP_TYPES).map(([type, info]) => {
             const t = Number(type)
             const stats = typeStats[t]
-            if (!stats || stats.count === 0) return null
+            const isSelected = selectedAppType === t || (selectedAppType === null && selectedTypes.has(t))
             
             return (
               <div 
                 key={t}
-                className="type-item"
+                className={`type-item ${isSelected ? 'selected' : ''}`}
+                onClick={() => setSelectedAppType(selectedAppType === t ? null : t)}
                 style={{ '--type-color': info.color } as React.CSSProperties}
               >
                 <div className="type-info">
                   <span className="type-icon" style={{ color: info.color }}>{info.icon}</span>
                   <span className="type-label">{info.label}</span>
-                  <span className="type-badge">{stats.count}</span>
+                  <span className="type-badge">{stats?.count || 0}</span>
+                </div>
+                <div className="type-stats">
+                  <span>in: {stats?.incoming || 0}</span>
+                  <span>out: {stats?.outgoing || 0}</span>
                 </div>
                 <div className="type-bar">
                   <div 
                     className="type-bar-fill" 
                     style={{ 
-                      width: `${((stats.count) / (data?.stats?.total_nodes || data?.nodes?.length || 1)) * 100}%`,
+                      width: `${((stats?.count || 0) / (data?.stats?.total_nodes || data?.nodes?.length || 1)) * 100}%`,
                       background: info.color 
                     }}
                   />
@@ -818,16 +845,12 @@ export default function App() {
                       <div className="section-label">← From</div>
                       <div className="connected-list">
                         {incoming.map(e => {
-                          const fromNode = data.nodes.find(n => n.name === e.from)
                           return (
                             <div
                               key={e.from}
                               className="connected-item"
                               onClick={() => focusNode(e.from)}
                             >
-                              <span style={{ color: APP_TYPES[fromNode?.app_type || 0]?.color }}>
-                                {APP_TYPES[fromNode?.app_type || 0]?.icon}
-                              </span>
                               {e.from}
                             </div>
                           )
@@ -841,16 +864,12 @@ export default function App() {
                       <div className="section-label">→ To</div>
                       <div className="connected-list">
                         {outgoing.map(e => {
-                          const toNode = data.nodes.find(n => n.name === e.to)
                           return (
                             <div
                               key={e.to}
                               className="connected-item"
                               onClick={() => focusNode(e.to)}
                             >
-                              <span style={{ color: APP_TYPES[toNode?.app_type || 0]?.color }}>
-                                {APP_TYPES[toNode?.app_type || 0]?.icon}
-                              </span>
                               {e.to}
                             </div>
                           )
