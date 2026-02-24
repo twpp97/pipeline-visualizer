@@ -49,8 +49,8 @@ export default function App() {
   const minimapRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [data, setData] = useState<PipelineData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [, setLoading] = useState(true)
+  const [, setError] = useState<string | null>(null)
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const [hoveredNode, setHoveredNode] = useState<string | null>(null)
   const [selectedAppType, setSelectedAppType] = useState<number | null>(null)
@@ -141,18 +141,20 @@ export default function App() {
     return { nodes: nodesWithExternalFlag, edges: filteredEdges }
   }, [data, selectedAppType, selectedTypes])
 
-  // Toggle type
-  const toggleType = (type: number) => {
-    const newSet = new Set(selectedTypes)
-    if (newSet.has(type)) {
-      if (newSet.size > 1) {
-        newSet.delete(type)
-      }
-    } else {
-      newSet.add(type)
-    }
-    setSelectedTypes(newSet)
+  // Toggle type (for future use in filtering UI)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _toggleType = (_type: number) => {
+    // const newSet = new Set(selectedTypes)
+    // if (newSet.has(type)) {
+    //   if (newSet.size > 1) {
+    //     newSet.delete(type)
+    //   }
+    // } else {
+    //   newSet.add(type)
+    // }
+    // setSelectedTypes(newSet)
   }
+  void _toggleType
 
   const selectAll = () => setSelectedTypes(new Set(Object.keys(APP_TYPES).map(Number)))
   const selectNone = () => setSelectedTypes(new Set([...selectedTypes].slice(0, 1)))
@@ -449,7 +451,7 @@ export default function App() {
           if (!event.active) simulation.alphaTarget(0)
           d.fx = null
           d.fy = null
-        }))
+        }) as any)
       .on('click', (_, d) => setSelectedNode(d.name))
       .on('mouseenter', (_, d) => setHoveredNode(d.name))
       .on('mouseleave', () => setHoveredNode(null))
